@@ -6,7 +6,7 @@ require 'redis'
 require 'sinatra'
 
 TYPES = %w[internet pmg17 lan].freeze
-REDIS = Redis.new
+REDIS = Redis.new url: ENV['REDIS_URL']
 
 class App < Sinatra::Application
   get '/' do
