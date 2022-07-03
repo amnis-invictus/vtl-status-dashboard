@@ -41,9 +41,9 @@ class App < Sinatra::Application
     cipher = OpenSSL::Cipher::Cipher.new(CIPHER_NAME)
     key_iv = OpenSSL::PKCS5.pbkdf2_hmac(POST_SECRET, salt, ITERATIONS, KEY_SIZE + IV_SIZE, DIGEST)
 
+    cipher.decrypt
     cipher.key = key_iv[0...KEY_SIZE]
     cipher.iv = key_iv[KEY_SIZE..]
-    cipher.decrypt
 
     json_data = cipher.update(enc_data) + cipher.final
 
