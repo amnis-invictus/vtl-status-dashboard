@@ -49,10 +49,10 @@ class App < Sinatra::Application
 
     json_data = cipher.update(data) + cipher.final
 
-    type, id = JSON.parse(json_data).values_at('type', 'id')
-    return 422 if type.nil? || id.nil? || !TYPES.include?(type)
+    type, name = JSON.parse(json_data).values_at('type', 'name')
+    return 422 if type.nil? || name.nil? || !TYPES.include?(type)
 
-    REDIS.hset type, id, json_data
+    REDIS.hset type, name, json_data
     201
   end
 end
