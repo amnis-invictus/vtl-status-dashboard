@@ -8,14 +8,15 @@ require 'sinatra'
 require 'openssl'
 
 TYPES = %w[internet pmg17 lan].freeze
-CIPHER = 'AES-256-CBC'
+DIGEST = OpenSSL::Digest.new('SHA256').freeze
+CIPHER_NAME = 'AES-256-CBC'
 MAGIC = 'Salted__'
 SALT_SIZE = 8
 KEY_SIZE = 32
 IV_SIZE = 16
+ITERATIONS = 10_000
 REDIS = Redis.new url: ENV['REDIS_URL']
-POST_SECRET = ENV['POST_SECRET']
-
+POST_SECRET = ENV.fetch('POST_SECRET')
 
 class App < Sinatra::Application
   get '/' do
@@ -34,20 +35,17 @@ class App < Sinatra::Application
 
     enc_data = Base64.decode64(enc_data_base64)
 
-    return 422 unless MAGIC == enc_data[0..(MAGIC.size - 1)]
+    return 422 unless MAGIC == enc_data.slice!(0, MAGIC.size)
 
-    salt = enc_data[MAGIC.size..(MAGIC.size + SALT_SIZE.size - 1)]
-    data = enc_data[(MAGIC.size + SALT_SIZE.size)..-1]
+    salt = enc_data.slice!(0, SALT_SIZE.size)
+    cipher = OpenSSL::Cipher::Cipher.new(CIPHER_NAME)
+    key_iv = OpenSSL::PKCS5.pbkdf2_hmac(POST_SECRET, salt, ITERATIONS, KEY_SIZE + IV_SIZE, DIGEST)
 
-    digest = OpenSSL::Digest.new('SHA256')
-    cipher = OpenSSL::Cipher::Cipher.new(CIPHER)
-    key_iv = OpenSSL::PKCS5.pbkdf2_hmac(POST_SECRET, salt, 10_000, KEY_SIZE + IV_SIZE, digest)
-
-    cipher.key = key_iv[0..(KEY_SIZE - 1)]
-    cipher.iv = key_iv[KEY_SIZE..-1]
+    cipher.key = key_iv[0...KEY_SIZE]
+    cipher.iv = key_iv[KEY_SIZE..]
     cipher.decrypt
 
-    json_data = cipher.update(data) + cipher.final
+    json_data = cipher.update(enc_data) + cipher.final
 
     type, name = JSON.parse(json_data).values_at('type', 'name')
     return 422 if type.nil? || name.nil? || !TYPES.include?(type)
